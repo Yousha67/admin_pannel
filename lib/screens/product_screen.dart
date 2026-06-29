@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
 import '../models/dress_model.dart';
-import 'edit_product.dart';
+import '../widgets/dynamic_image.dart';
+import 'package:flutter/material.dart';
 
+import 'edit_product.dart';
 class ProductsScreen extends StatelessWidget {
   const ProductsScreen({super.key});
 
@@ -60,8 +61,8 @@ class ProductsScreen extends StatelessWidget {
                   flex: 6,
                   child: ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                    child: Image.asset(
-                      dress.imageUrl,
+                    child: DynamicImage(
+                      imageUrl: dress.imageUrl,
                       fit: BoxFit.cover,
                       width: double.infinity,
                     ),

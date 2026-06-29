@@ -1,9 +1,8 @@
 import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../services/imgbb_service.dart';
 
 class AddProductScreen extends StatefulWidget {
   const AddProductScreen({super.key});
@@ -49,13 +48,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   Future<void> _uploadImage() async {
     if (_image == null) return;
-
-    final fileName = 'dresses/${DateTime
-        .now()
-        .millisecondsSinceEpoch}.jpg';
-    final ref = FirebaseStorage.instance.ref().child(fileName);
-    await ref.putFile(_image!);
-    imageUrl = await ref.getDownloadURL();
+    imageUrl = await ImgBBService.uploadImage(_image!);
   }
 
   void _addTag(String value, List<String> list) {

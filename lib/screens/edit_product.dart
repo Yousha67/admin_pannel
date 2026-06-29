@@ -1,6 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/dress_model.dart';
+import '../services/imgbb_service.dart';
+import '../widgets/dynamic_image.dart';
 
 class EditProductScreen extends StatefulWidget {
   final String productId;
@@ -30,6 +34,9 @@ class _EditProductScreenState extends State<EditProductScreen> {
   int? rewardPoints;
   String? discountTagline;
   DateTime? createdAt;
+
+  File? _newImage;
+  final _picker = ImagePicker();
 
   late Dress selectedDress;
   final _formKey = GlobalKey<FormState>();
@@ -69,9 +76,27 @@ class _EditProductScreenState extends State<EditProductScreen> {
     });
   }
 
+  Future<void> _pickImage() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery);
+    if (picked != null) {
+      setState(() {
+        _newImage = File(picked.path);
+      });
+    }
+  }
+
+  Future<void> _uploadImage() async {
+    if (_newImage == null) return;
+    final uploadedUrl = await ImgBBService.uploadImage(_newImage!);
+    if (uploadedUrl != null) {
+      imageUrl = uploadedUrl;
+    }
+  }
+
   // Update product details
   void updateProduct() async {
     if (_formKey.currentState!.validate()) {
+      await _uploadImage();
       final updatedDress = Dress(
         id: selectedDress.id,
         name: name!,
@@ -144,6 +169,57 @@ class _EditProductScreenState extends State<EditProductScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Center(
+                child: GestureDetector(
+                  onTap: _pickImage,
+                  child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Container(
+                      height: 180,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.grey[100],
+                      ),
+                      child: _newImage != null
+                          ? ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.file(
+                          _newImage!,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                        ),
+                      )
+                          : (imageUrl != null
+                          ? ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: DynamicImage(
+                          imageUrl: imageUrl!,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                        ),
+                      )
+                          : Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.image, size: 50, color: Colors.grey),
+                            SizedBox(height: 10),
+                            Text(
+                              'Tap to pick new image',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      )),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
               _sectionTitle("Basic Information"),
               _buildTextField("Product Name", name!, (val) => name = val),
               _buildTextField("Category", category!, (val) => category = val),
