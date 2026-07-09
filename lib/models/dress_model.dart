@@ -47,24 +47,26 @@ class Dress {
   factory Dress.fromFirestore(Map<String, dynamic> data, String dressId) {
     return Dress(
       id: dressId,
-      name: data['name'],
-      category: data['category'],
-      brand: data['brand'],
-      material: data['material'],
-      originalPrice: data['originalPrice'],
-      salePrice: data['salePrice'],
-      popularity: data['popularity'],
-      recommended: data['recommended'],
-      isOnSale: data['isOnSale'],
-      imageUrl: data['imageUrl'],
-      stock: data['stock'],
-      rating: data['rating'],
-      reviewCount: data['reviewCount'],
-      sizes: List<String>.from(data['sizes']),
-      colors: List<String>.from(data['colors']),
-      rewardPoints: data['rewardPoints'],
+      name: data['name'] ?? '',
+      category: data['category'] ?? '',
+      brand: data['brand'] ?? '',
+      material: data['material'] ?? '',
+      originalPrice: (data['originalPrice'] as num?)?.toDouble() ?? 0.0,
+      salePrice: (data['salePrice'] as num?)?.toDouble(),
+      popularity: (data['popularity'] as num?)?.toInt() ?? 0,
+      recommended: data['recommended'] ?? false,
+      isOnSale: data['isOnSale'] ?? false,
+      imageUrl: data['imageUrl'] ?? '',
+      stock: (data['stock'] as num?)?.toInt() ?? 0,
+      rating: (data['rating'] as num?)?.toDouble() ?? 0.0,
+      reviewCount: (data['reviewCount'] as num?)?.toInt() ?? 0,
+      sizes: List<String>.from(data['sizes'] ?? []),
+      colors: List<String>.from(data['colors'] ?? []),
+      rewardPoints: (data['rewardPoints'] as num?)?.toInt() ?? 0,
       discountTagline: data['discountTagline'],
-      createdAt: (data['createdAt'] as Timestamp).toDate(), // ✅ Correctly converting Timestamp to DateTime
+      createdAt: data['createdAt'] != null
+          ? (data['createdAt'] as Timestamp).toDate()
+          : DateTime.now(),
     );
   }
 

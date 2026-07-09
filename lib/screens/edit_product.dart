@@ -40,6 +40,8 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
   late Dress selectedDress;
   final _formKey = GlobalKey<FormState>();
+  bool _isLoading = true;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -48,32 +50,45 @@ class _EditProductScreenState extends State<EditProductScreen> {
   }
 
   // Fetch product data from Firestore based on productId
-  void fetchProductData() {
-    selectedDress = dresses.firstWhere(
-          (dress) => dress.id == widget.productId,
-      orElse: () => throw Exception("Product not found"),
-    );
-
-    setState(() {
-      name = selectedDress.name;
-      category = selectedDress.category;
-      brand = selectedDress.brand;
-      material = selectedDress.material;
-      originalPrice = selectedDress.originalPrice;
-      salePrice = selectedDress.salePrice;
-      popularity = selectedDress.popularity;
-      recommended = selectedDress.recommended;
-      isOnSale = selectedDress.isOnSale;
-      imageUrl = selectedDress.imageUrl;
-      stock = selectedDress.stock;
-      rating = selectedDress.rating;
-      reviewCount = selectedDress.reviewCount;
-      sizes = selectedDress.sizes;
-      colors = selectedDress.colors;
-      rewardPoints = selectedDress.rewardPoints;
-      discountTagline = selectedDress.discountTagline;
-      createdAt = selectedDress.createdAt;
-    });
+  Future<void> fetchProductData() async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('dresses').doc(widget.productId).get();
+      if (doc.exists) {
+        selectedDress = Dress.fromFirestore(doc.data()!, doc.id);
+        setState(() {
+          name = selectedDress.name;
+          category = selectedDress.category;
+          brand = selectedDress.brand;
+          material = selectedDress.material;
+          originalPrice = selectedDress.originalPrice;
+          salePrice = selectedDress.salePrice;
+          popularity = selectedDress.popularity;
+          recommended = selectedDress.recommended;
+          isOnSale = selectedDress.isOnSale;
+          imageUrl = selectedDress.imageUrl;
+          stock = selectedDress.stock;
+          rating = selectedDress.rating;
+          reviewCount = selectedDress.reviewCount;
+          sizes = List<String>.from(selectedDress.sizes);
+          colors = List<String>.from(selectedDress.colors);
+          rewardPoints = selectedDress.rewardPoints;
+          discountTagline = selectedDress.discountTagline;
+          createdAt = selectedDress.createdAt;
+          _isLoading = false;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Product not found")),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      print("Error fetching product: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error loading product: $e")),
+      );
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _pickImage() async {
@@ -96,32 +111,35 @@ class _EditProductScreenState extends State<EditProductScreen> {
   // Update product details
   void updateProduct() async {
     if (_formKey.currentState!.validate()) {
-      await _uploadImage();
-      final updatedDress = Dress(
-        id: selectedDress.id,
-        name: name!,
-        category: category!,
-        brand: brand!,
-        material: material!,
-        originalPrice: originalPrice!,
-        salePrice: salePrice,
-        popularity: popularity!,
-        recommended: recommended!,
-        isOnSale: isOnSale!,
-        imageUrl: imageUrl!,
-        stock: stock!,
-        rating: rating!,
-        reviewCount: reviewCount!,
-        sizes: sizes!,
-        colors: colors!,
-        rewardPoints: rewardPoints!,
-        discountTagline: discountTagline,
-        createdAt: createdAt!,
-      );
-
+      setState(() {
+        _isSaving = true;
+      });
       try {
+        await _uploadImage();
+        final updatedDress = Dress(
+          id: selectedDress.id,
+          name: name!,
+          category: category!,
+          brand: brand!,
+          material: material!,
+          originalPrice: originalPrice!,
+          salePrice: salePrice,
+          popularity: popularity!,
+          recommended: recommended!,
+          isOnSale: isOnSale!,
+          imageUrl: imageUrl!,
+          stock: stock!,
+          rating: rating!,
+          reviewCount: reviewCount!,
+          sizes: sizes!,
+          colors: colors!,
+          rewardPoints: rewardPoints!,
+          discountTagline: discountTagline?.isNotEmpty == true ? discountTagline : null,
+          createdAt: createdAt!,
+        );
+
         // Save the updated Dress object to Firestore
-        await FirebaseFirestore.instance.collection('products').doc(
+        await FirebaseFirestore.instance.collection('dresses').doc(
             widget.productId).update({
           'name': updatedDress.name,
           'category': updatedDress.category,
@@ -144,26 +162,80 @@ class _EditProductScreenState extends State<EditProductScreen> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Product updated successfully!")));
+            const SnackBar(content: Text("Product updated successfully!")));
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Error updating product")));
+            SnackBar(content: Text("Error updating product: $e")));
         print("Error updating product: $e");
+      } finally {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _deleteProduct() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Product"),
+        content: const Text("Are you sure you want to delete this product? This action cannot be undone."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() {
+        _isSaving = true;
+      });
+      try {
+        await FirebaseFirestore.instance.collection('dresses').doc(widget.productId).delete();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Product deleted successfully")),
+        );
+        Navigator.of(context).pop();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error deleting product: $e")),
+        );
+      } finally {
+        setState(() {
+          _isSaving = false;
+        });
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (name == null || category == null || brand == null || material == null ||
-        originalPrice == null || stock == null || rating == null) {
-      return Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text("Edit Product")),
+      appBar: AppBar(
+        title: const Text("Edit Product"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete, color: Colors.red),
+            tooltip: "Delete Product",
+            onPressed: _isSaving ? null : _deleteProduct,
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
           child: Column(
@@ -202,10 +274,10 @@ class _EditProductScreenState extends State<EditProductScreen> {
                           width: double.infinity,
                         ),
                       )
-                          : Center(
+                          : const Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
+                          children: [
                             Icon(Icons.image, size: 50, color: Colors.grey),
                             SizedBox(height: 10),
                             Text(
@@ -226,7 +298,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
               _buildTextField("Brand", brand!, (val) => brand = val),
               _buildTextField("Material", material!, (val) => material = val),
 
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               _sectionTitle("Pricing & Inventory"),
               _buildNumberField(
                   "Original Price", originalPrice!.toString(), (val) =>
@@ -237,7 +309,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
               _buildNumberField("Stock", stock!.toString(), (val) =>
               stock = int.tryParse(val)),
 
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               _sectionTitle("Ratings & Reviews"),
               _buildNumberField("Rating", rating!.toString(), (val) =>
               rating = double.tryParse(val)),
@@ -245,22 +317,22 @@ class _EditProductScreenState extends State<EditProductScreen> {
                   "Review Count", reviewCount!.toString(), (val) =>
               reviewCount = int.tryParse(val)),
 
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               _sectionTitle("Attributes"),
               _buildToggle(
                   "Recommended", recommended!, (val) => recommended = val),
               _buildToggle("On Sale", isOnSale!, (val) => isOnSale = val),
 
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               _sectionTitle("Sizes"),
               _buildChoiceWrap(sizes!, (selectedList) => sizes = selectedList),
 
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               _sectionTitle("Colors"),
               _buildChoiceWrap(
                   colors!, (selectedList) => colors = selectedList),
 
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               _sectionTitle("Other Details"),
               _buildNumberField(
                   "Reward Points", rewardPoints!.toString(), (val) =>
@@ -269,14 +341,21 @@ class _EditProductScreenState extends State<EditProductScreen> {
                   "Discount Tagline", discountTagline ?? "", (val) =>
               discountTagline = val),
 
-              SizedBox(height: 30),
+              const SizedBox(height: 30),
               Center(
                 child: ElevatedButton.icon(
-                  icon: Icon(Icons.save),
-                  label: Text("Save Changes"),
-                  onPressed: updateProduct,
-                  style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(
-                      horizontal: 30, vertical: 14)),
+                  icon: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.save),
+                  label: Text(_isSaving ? "Saving..." : "Save Changes"),
+                  onPressed: _isSaving ? null : updateProduct,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
+                  ),
                 ),
               ),
             ],
